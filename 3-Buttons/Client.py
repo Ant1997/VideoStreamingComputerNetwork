@@ -2,6 +2,7 @@ from tkinter import *
 import tkinter.messagebox
 from PIL import Image, ImageTk
 import socket, threading, sys, traceback, os
+from time import time
  
 from RtpPacket import RtpPacket
  
@@ -34,6 +35,8 @@ class Client:
         self.teardownAcked = 0
         self.connectToServer()
         self.frameNbr = 0.
+        self.playTime = 0.0
+    
         #Added to initialize setup
         if self.state == self.INIT:
             self.sendRtspRequest(self.SETUP)
@@ -73,7 +76,7 @@ class Client:
     #def setupMovie(self):
     #    """Setup button handler."""
     #    if self.state == self.INIT:
-    #        self.sendRtspRequest(self.SETUP)
+    #``        self.sendRtspRequest(self.SETUP)
     
     def exitClient(self):
         """Teardown button handler."""
@@ -97,27 +100,47 @@ class Client:
     
     def listenRtp(self):        
         """Listen for RTP packets."""
+        total_bytes_sent = 0
+        start_time = time()
+        elapsed_time = 0.0
         while True:
             try:
                 data = self.rtpSocket.recv(20480)
                 if data:
                     rtpPacket = RtpPacket()
                     rtpPacket.decode(data)
-                    
+                    bytes_sent = sys.getsizeof(data)
+                    total_bytes_sent = bytes_sent + total_bytes_sent
+
                     currFrameNbr = rtpPacket.seqNum()
-                    print("Current Seq Num: " + str(currFrameNbr))
-                                        
+                    end_time = time()
+                    elapsed_time = end_time - start_time
+                    real_playtime = elapsed_time + self.playTime
+                    video_data_rate = total_bytes_sent / real_playtime
+                    print("\nCurrent Seq Num: " + str(currFrameNbr))          
+                    #print("\nBytes sent: " + str(bytes_sent))    
+                    #print("Total Bytes sent: " + str(total_bytes_sent))       
+                    #print("PlayTime: " + str(self.playTime))    
+                    #print("Elapsed Time: " + str(elapsed_time))
+                    print("PlayTime: " + str(real_playtime)) 
+                    print("Video Date Rate: " + str(video_data_rate) + " total bytes/sec\n") 
                     if currFrameNbr > self.frameNbr: # Discard the late packet
                         self.frameNbr = currFrameNbr
                         self.updateMovie(self.writeFrame(rtpPacket.getPayload()))
             except:
                 # Stop listening upon requesting PAUSE or TEARDOWN
                 if self.playEvent.isSet(): 
+                    self.playTime = self.playTime + elapsed_time
+                    elapsed_time = 0.0
+                    print("PlayTime: " + str(real_playtime)) 
                     break
                 
                 # Upon receiving ACK for TEARDOWN request,
                 # close the RTP socket
                 if self.teardownAcked == 1:
+                    self.playTime = self.playTime + elapsed_time
+                    elapsed_time = 0.0
+                    print("PlayTime: " + str(real_playtime)) 
                     self.rtpSocket.shutdown(socket.SHUT_RDWR)
                     self.rtpSocket.close()
                     break
