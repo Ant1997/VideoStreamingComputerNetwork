@@ -1,4 +1,5 @@
 from random import randint
+import random
 import sys, traceback, threading, socket
 
 from VideoStream import VideoStream
@@ -118,7 +119,10 @@ class ServerWorker:
 				break 
 				
 			data = self.clientInfo['videoStream'].nextFrame()
-			if data: 
+
+			#random int to drop frame
+			randNum = random.randint(1,100)
+			if data and randNum > 5: #drop 5% of frames
 				frameNumber = self.clientInfo['videoStream'].frameNbr()
 				try:
 					address = self.clientInfo['rtspSocket'][1][0]

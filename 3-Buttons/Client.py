@@ -18,6 +18,9 @@ class Client:
     PLAY = 1
     PAUSE = 2
     TEARDOWN = 3
+
+    NUM_LOST_PACKETS = 0
+    NUM_RECV_PACKETS = 0
     
     # Initiation..
     def __init__(self, master, serveraddr, serverport, rtpport, filename):
@@ -106,10 +109,22 @@ class Client:
                     
                     currFrameNbr = rtpPacket.seqNum()
                     print("Current Seq Num: " + str(currFrameNbr))
-                                        
-                    if currFrameNbr > self.frameNbr: # Discard the late packet
+                    
+                    if currFrameNbr - self.frameNbr > 1: #dropped packet
+                        self.NUM_LOST_PACKETS = self.NUM_LOST_PACKETS + 1
                         self.frameNbr = currFrameNbr
-                        self.updateMovie(self.writeFrame(rtpPacket.getPayload()))
+                        self.updateMovie(self.writeFrame(rtpPacket.getPayload()))  
+
+                    elif currFrameNbr > self.frameNbr: # Discard the late packet
+                        self.NUM_RECV_PACKETS = self.NUM_RECV_PACKETS + 1 #increase num of packets recieved
+                        self.frameNbr = currFrameNbr
+                        self.updateMovie(self.writeFrame(rtpPacket.getPayload()))  
+
+                # print statistics
+                print("NUM_LOST_PACKETS: ", self.NUM_LOST_PACKETS)
+                print("NUM_RECV_PACKETS: ", self.NUM_RECV_PACKETS)
+                print("PACKET LOSS RATE: ", 100 * self.NUM_LOST_PACKETS/(self.NUM_LOST_PACKETS + self.NUM_RECV_PACKETS), "%")
+
             except:
                 # Stop listening upon requesting PAUSE or TEARDOWN
                 if self.playEvent.isSet(): 
@@ -224,7 +239,6 @@ class Client:
     
     def recvRtspReply(self):
         """Receive RTSP reply from the server."""
-        print('recieved rtsp reply')
         while True:
             reply = self.rtspSocket.recv(1024)
             if reply: 
@@ -237,7 +251,6 @@ class Client:
                 break
     
     def parseRtspReply(self, data):
-        print('reply being parsed')
         """Parse the RTSP reply from the server."""
         decodedData = data.decode() #^^^^^^
         lines = decodedData.split('\n')
@@ -278,7 +291,7 @@ class Client:
                         # self.state = ...
                         self.state = self.INIT
                         # Flag the teardownAcked to close the socket.
-                        self.teardownAcked = 1 
+                        self.teardownAcked = 1
     
     def openRtpPort(self):
         """Open RTP socket binded to a specified port."""
