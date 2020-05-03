@@ -19,6 +19,9 @@ class Client:
     PLAY = 1
     PAUSE = 2
     TEARDOWN = 3
+
+    NUM_LOST_PACKETS = 0
+    NUM_RECV_PACKETS = 0
     
     # Initiation..
     def __init__(self, master, serveraddr, serverport, rtpport, filename):
@@ -123,10 +126,23 @@ class Client:
                     #print("PlayTime: " + str(self.playTime))    
                     #print("Elapsed Time: " + str(elapsed_time))
                     print("PlayTime: " + str(real_playtime)) 
-                    print("Video Date Rate: " + str(video_data_rate) + " total bytes/sec\n") 
-                    if currFrameNbr > self.frameNbr: # Discard the late packet
+                    print("Video Date Rate: " + str(video_data_rate) + " total bytes/sec") 
+                    
+                    if currFrameNbr - self.frameNbr > 1: #dropped packet
+                        self.NUM_LOST_PACKETS = self.NUM_LOST_PACKETS + 1
+                        self.frameNbr = currFrameNbr
+                        self.updateMovie(self.writeFrame(rtpPacket.getPayload()))  
+
+                    elif currFrameNbr > self.frameNbr: # Discard the late packet
+                        self.NUM_RECV_PACKETS = self.NUM_RECV_PACKETS + 1
                         self.frameNbr = currFrameNbr
                         self.updateMovie(self.writeFrame(rtpPacket.getPayload()))
+
+                    # print statistics
+                    print("NUM_LOST_PACKETS: ", self.NUM_LOST_PACKETS)
+                    print("NUM_RECV_PACKETS: ", self.NUM_RECV_PACKETS)
+                    print("PACKET LOSS RATE: ", 100 * self.NUM_LOST_PACKETS/(self.NUM_LOST_PACKETS + self.NUM_RECV_PACKETS), "%")
+
             except:
                 # Stop listening upon requesting PAUSE or TEARDOWN
                 if self.playEvent.isSet(): 
