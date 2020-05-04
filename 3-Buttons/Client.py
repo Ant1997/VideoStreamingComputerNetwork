@@ -22,6 +22,7 @@ class Client:
 
     NUM_LOST_PACKETS = 0
     NUM_RECV_PACKETS = 0
+    TOTAL_JITTER = 0
 
     # Initiation..
     def __init__(self, master, serveraddr, serverport, rtpport, filename):
@@ -39,9 +40,6 @@ class Client:
         self.connectToServer()
         self.frameNbr = 0.
         self.playTime = 0.0
-        self.totalJitter = 0
-        self.arrivalTimeofPreviousPacket = 0
-        self.lastPacketSpacing = 0
 
         #Added to initialize setup
         if self.state == self.INIT:
@@ -109,6 +107,10 @@ class Client:
         total_bytes_sent = 0
         start_time = time()
         elapsed_time = 0.0
+        arrivalTimeOfPacket = time()
+        arrivalTimeOfPreviousPacket = time()
+        currentPacketSpacing = 0
+        lastPacketSpacing = 0
         while True:
             try:
                 data = self.rtpSocket.recv(20480)
@@ -129,7 +131,7 @@ class Client:
                     #print("PlayTime: " + str(self.playTime))
                     #print("Elapsed Time: " + str(elapsed_time))
                     print("PlayTime: " + str(real_playtime))
-                    print("Video Date Rate: " + str(video_data_rate) + " total bytes/sec")
+                    print("Video Data Rate: " + str(video_data_rate) + " total bytes/sec")
 
                     if currFrameNbr - self.frameNbr > 1: #dropped packet
                         self.NUM_LOST_PACKETS = self.NUM_LOST_PACKETS + 1
@@ -141,18 +143,25 @@ class Client:
                         self.frameNbr = currFrameNbr
                         self.updateMovie(self.writeFrame(rtpPacket.getPayload()))
 
-                    elif self.lastSequence == currFrameNbr - 1 and currFrameNbr > 1:
-                        interPacketSpacing = arrivalTimeOfPacket - self.arrivalTimeofPreviousPacket
-                        jitterIncrement = abs(interPacketSpacing-self.lastPacketSpacing)
-                        self.totalJitter = self.totalJitter + jitterIncrement
-                        self.lastPacketSpacing = interPacketSpacing
+                    #set arrival times
+                    arrivalTimeofPreviousPacket = arrivalTimeOfPacket
+                    arrivalTimeOfPacket = end_time
+
+                    #set packet spacing
+                    interPacketSpacing = arrivalTimeOfPacket - arrivalTimeOfPreviousPacket
+                    lastPacketSpacing = currentPacketSpacing
+                    currentPacketSpacing = interPacketSpacing
+                    jitterIncrement = abs(interPacketSpacing-lastPacketSpacing)
+
+                    self.TOTAL_JITTER = self.TOTAL_JITTER + jitterIncrement
+                    lastPacketSpacing = interPacketSpacing
 
                     # print statistics
                     print("NUM_LOST_PACKETS: ", self.NUM_LOST_PACKETS)
                     print("NUM_RECV_PACKETS: ", self.NUM_RECV_PACKETS)
                     print("PACKET LOSS RATE: ", 100 * self.NUM_LOST_PACKETS/(self.NUM_LOST_PACKETS + self.NUM_RECV_PACKETS), "%")
-                    print("TOTAL JITTER: %.3fms" % (self.totalJitter * 1000))
-                    print("AVG JITTER: %.3fms" % ((self.totalJitter / self.NUM_RECV_PACKETS) * 1000))
+                    print("TOTAL JITTER: %.3fms" % (self.TOTAL_JITTER))
+                    print("AVG JITTER: %.3fms" % ((self.TOTAL_JITTER / (self.NUM_RECV_PACKETS))))
 
             except:
                 # Stop listening upon requesting PAUSE or TEARDOWN

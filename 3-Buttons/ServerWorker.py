@@ -1,5 +1,6 @@
 from random import randint
 import random
+import time
 import sys, traceback, threading, socket
 
 from VideoStream import VideoStream
@@ -21,11 +22,14 @@ class ServerWorker:
 	CON_ERR_500 = 2
 
 	clientInfo = {}
+	MAX_JITTER = 0
+	dropped_packets = 0
 	dataLoss = 0
 
-	def __init__(self, clientInfo, jitter):
+	def __init__(self, clientInfo, jitter, dropped_packets):
 		self.clientInfo = clientInfo
 		self.MAX_JITTER = jitter
+		self.dropped_packets = dropped_packets
 
 	def run(self):
 		threading.Thread(target=self.recvRtspRequest).start()
@@ -127,7 +131,7 @@ class ServerWorker:
 
 			data = self.clientInfo['videoStream'].nextFrame()
 			randNum = random.randint(1,100)
-			if data and randNum > 8: # drop 8% of packets
+			if data and randNum > self.dropped_packets: # drop this aount of packets per 100 frames
 				frameNumber = self.clientInfo['videoStream'].frameNbr()
 				try:
 					address = self.clientInfo['rtspSocket'][1][0]

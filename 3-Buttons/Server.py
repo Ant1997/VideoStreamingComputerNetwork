@@ -7,6 +7,8 @@ class Server:
 	def main(self):
 		try:
 			SERVER_PORT = int(sys.argv[1])
+			JITTER = int(sys.argv[2])
+			PACKET_DROP = int(sys.argv[3])
 		except:
 			print("[Usage: Server.py Server_port]\n")
 		rtspSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -17,7 +19,7 @@ class Server:
 		while True:
 			clientInfo = {}
 			clientInfo['rtspSocket'] = rtspSocket.accept()
-			ServerWorker(clientInfo).run()		
+			ServerWorker(clientInfo, JITTER, PACKET_DROP).run()		
 
 if __name__ == "__main__":
 	(Server()).main()
